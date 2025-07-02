@@ -1,0 +1,55 @@
+name: narratrivia
+description: "App di trivia narrativa con domande su anime, manga, videogiochi, serie TV, film e libri."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Gestione stato
+  provider: ^6.1.1
+
+  # Storage locale
+  shared_preferences: ^2.2.2
+
+  # Database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
+  # Internazionalizzazione
+  intl: 0.20.2
+
+  # Audio
+  audioplayers: ^6.5.0
+
+  # UI
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  generate: false
+
+  assets:
+    - assets/images/backgrounds/
+    - assets/images/buttons/
+    - assets/images/icons/
+    - assets/sounds/
+    - assets/data/
+    - assets/fonts/
+
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
