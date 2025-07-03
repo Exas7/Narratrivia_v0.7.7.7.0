@@ -285,7 +285,7 @@ class _GameScreenState extends State<GameScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.purple.withValues(alpha: 0.3),
+                  color: Colors.purple.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Column(
@@ -493,7 +493,7 @@ class _GameScreenState extends State<GameScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.purple.withValues(alpha: 0.7),
+                          color: Colors.purple.withOpacity(0.7),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -535,9 +535,9 @@ class _GameScreenState extends State<GameScreen> {
                     margin: const EdgeInsets.all(20),
                     padding: const EdgeInsets.all(25),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
+                      color: Colors.black.withOpacity(0.7),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.purple.withValues(alpha: 0.5), width: 2),
+                      border: Border.all(color: Colors.purple.withOpacity(0.5), width: 2),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -547,7 +547,7 @@ class _GameScreenState extends State<GameScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.purple.withValues(alpha: 0.3),
+                              color: Colors.purple.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(15),
                             ),
                             child: Text(
@@ -680,7 +680,7 @@ class _GameScreenState extends State<GameScreen> {
           child: ElevatedButton(
             onPressed: _showingFeedback ? null : () => _handleMultipleChoiceAnswer(index),
             style: ElevatedButton.styleFrom(
-              backgroundColor: buttonColor.withValues(alpha: 0.3),
+              backgroundColor: buttonColor.withOpacity(0.3),
               padding: const EdgeInsets.all(16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),

@@ -85,7 +85,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     final opacity = 0.7 * (1 - settings.brightness);
                     return IgnorePointer(
                       child: Container(
-                        color: Colors.black.withValues(alpha: opacity),
+                        color: Colors.black.withOpacity(opacity),
                       ),
                     );
                   },
