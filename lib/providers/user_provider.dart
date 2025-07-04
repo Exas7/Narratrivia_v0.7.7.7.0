@@ -34,6 +34,7 @@ class UserProvider extends ChangeNotifier {
   List<Badge> get allBadges => _allBadges;
   List<Badge> get unlockedBadges =>
       _allBadges.where((b) => _unlockedBadgeIds.contains(b.badgeId)).toList();
+  List<int> get unlockedBadgeIds => List.unmodifiable(_unlockedBadgeIds);
   List<Title> get allTitles => _allTitles;
   Title? get currentTitle =>
       _allTitles.firstWhere((t) => t.titleId == _currentTitleId);

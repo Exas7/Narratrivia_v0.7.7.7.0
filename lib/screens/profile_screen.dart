@@ -289,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         badge.iconEmoji,
                         style: TextStyle(
                           fontSize: 30,
-                          opacity: isUnlocked ? 1.0 : 0.3,
+                          color: Colors.white.withOpacity(isUnlocked ? 1.0 : 0.3),
                         ),
                       ),
                     ),
