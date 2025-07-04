@@ -8,52 +8,73 @@ import '/models/question.dart';
 import '/models/multiple_choice_answer.dart';
 
 class GameScreen extends StatefulWidget {
-  final String gameType; // 'true_false' o 'multiple_choice'
+  final String gameType; // 'true_false', 'multiple_choice', 'bad_images', 'bad_descriptions'
   final String category; // nome del medium o 'mix'
   final String mode; // 'classica', 'tempo', 'zen'
+  final String? variant; // 'classic', 'speed', 'inverse', etc.
 
   const GameScreen({
     super.key,
     required this.gameType,
     required this.category,
     required this.mode,
+    this.variant,
   });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
   Timer? _timer;
-  int _remainingSeconds = 60; // Per modalità tempo
+  int _remainingSeconds = 60;
   bool _isLoading = true;
   bool _showingFeedback = false;
-  int? _selectedAnswerIndex; // Per multiple choice
+  int? _selectedAnswerIndex;
+
+  // Controller per animazione pulsante timer
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+
+    // Setup animazione pulsante
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.2,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+
     _initializeGame();
   }
 
   Future<void> _initializeGame() async {
     final gameProvider = Provider.of<GameProvider>(context, listen: false);
 
-    // Imposta i filtri
+    // Imposta i filtri con variante
     gameProvider.setGameFilters(
       medium: widget.category == 'MIX' ? null : widget.category,
       gameMode: widget.mode,
       questionType: widget.gameType,
+      gameVariant: widget.variant,
     );
 
     // Carica le domande
     await gameProvider.loadQuestions(
       questionType: widget.gameType,
-      limit: widget.mode.toLowerCase() == 'zen' ? 100 : 20, // Zen mode = tante domande
     );
 
-    // Avvia il timer se modalità tempo
-    if (widget.mode.toLowerCase() == 'a tempo' || widget.mode.toLowerCase() == 'timed') {
+    // Avvia il timer se necessario
+    if (gameProvider.remainingTime > 0) {
+      _remainingSeconds = gameProvider.remainingTime;
       _startTimer();
     }
 
@@ -67,16 +88,26 @@ class _GameScreenState extends State<GameScreen> {
       setState(() {
         if (_remainingSeconds > 0) {
           _remainingSeconds--;
+
+          // Effetti timer
           if (_remainingSeconds <= 10) {
             AudioManager().playTimerTick();
+            _pulseController.repeat(reverse: true);
           }
         } else {
           _timer?.cancel();
+          _pulseController.stop();
           AudioManager().playTimeUp();
           _showGameOverDialog();
         }
       });
     });
+  }
+
+  Color _getTimerColor() {
+    if (_remainingSeconds <= 10) return Colors.red;
+    if (_remainingSeconds <= 30) return Colors.yellow;
+    return Colors.green;
   }
 
   void _handleTrueFalseAnswer(bool answer) async {
@@ -91,7 +122,19 @@ class _GameScreenState extends State<GameScreen> {
     await gameProvider.answerQuestion(answer);
 
     // Verifica se la risposta è corretta
-    final isCorrect = currentQuestion.correctAnswerAsBool == answer;
+    bool isCorrect;
+    if (gameProvider.isInverseMode) {
+      // In modalità inversa, mostra sempre feedback "corretto" per risposte sbagliate
+      isCorrect = currentQuestion.correctAnswerAsBool != answer;
+
+      // Se ha dato la risposta giusta in modalità inversa, game over
+      if (currentQuestion.correctAnswerAsBool == answer) {
+        _showInverseModeGameOver();
+        return;
+      }
+    } else {
+      isCorrect = currentQuestion.correctAnswerAsBool == answer;
+    }
 
     // Mostra feedback
     _showAnswerFeedback(isCorrect, currentQuestion, null);
@@ -121,6 +164,53 @@ class _GameScreenState extends State<GameScreen> {
     _showAnswerFeedback(isCorrect, currentQuestion, currentAnswers);
   }
 
+  void _showInverseModeGameOver() {
+    _timer?.cancel();
+    final l10n = AppLocalizations.of(context)!;
+
+    AudioManager().playWrongAnswer();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.red.shade900,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Colors.red, width: 3),
+          ),
+          title: const Text(
+            'GAME OVER!',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          content: Text(
+            'Hai dato la risposta CORRETTA!\nIn modalità Inversa devi sempre sbagliare!',
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                l10n.get('menu'),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAnswerFeedback(bool isCorrect, Question question, List<MultipleChoiceAnswer>? answers) {
     setState(() {
       _showingFeedback = true;
@@ -137,6 +227,7 @@ class _GameScreenState extends State<GameScreen> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         final l10n = AppLocalizations.of(context)!;
+        final gameProvider = Provider.of<GameProvider>(context, listen: false);
 
         return AlertDialog(
           backgroundColor: Colors.black87,
@@ -168,7 +259,7 @@ class _GameScreenState extends State<GameScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!isCorrect) ...[
+              if (!isCorrect && !gameProvider.isInverseMode) ...[
                 Text(
                   '${l10n.get('correct_answer_was')}:',
                   style: const TextStyle(color: Colors.white),
@@ -194,7 +285,7 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 const SizedBox(height: 10),
               ],
-              if (question.explanation != null && question.explanation!.isNotEmpty) ...[
+              if (question.explanation != null && question.explanation!.isNotEmpty && !gameProvider.isInverseMode) ...[
                 Text(
                   '${l10n.get('explanation')}:',
                   style: const TextStyle(
@@ -210,7 +301,7 @@ class _GameScreenState extends State<GameScreen> {
               ],
               const SizedBox(height: 10),
               Text(
-                '+${isCorrect ? question.basePoints : 0} ${l10n.get('points')}',
+                '+${isCorrect ? _calculatePoints(question) : 0} ${l10n.get('points')}',
                 style: TextStyle(
                   color: isCorrect ? Colors.green : Colors.grey,
                   fontSize: 18,
@@ -236,6 +327,30 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  int _calculatePoints(Question question) {
+    final gameProvider = Provider.of<GameProvider>(context, listen: false);
+
+    int basePoints = question.basePoints;
+
+    // Punteggi speciali per bad images/descriptions
+    if (question.type == 'bad_images') {
+      basePoints = question.difficulty == 'easy' ? 500 :
+      question.difficulty == 'normal' ? 850 : 1500;
+    } else if (question.type == 'bad_descriptions') {
+      basePoints = question.difficulty == 'easy' ? 750 :
+      question.difficulty == 'normal' ? 1250 : 2000;
+    }
+
+    // Applica moltiplicatore variante
+    double multiplier = 1.0;
+    if (gameProvider.selectedGameVariant == 'speed') multiplier = 1.5;
+    else if (gameProvider.selectedGameVariant == 'inverse') multiplier = 2.5;
+    else if (gameProvider.selectedGameVariant == 'universe') multiplier = 1.3;
+    else if (gameProvider.selectedGameVariant == 'timed') multiplier = 1.5;
+
+    return (basePoints * multiplier).round();
+  }
+
   void _nextQuestion() {
     setState(() {
       _showingFeedback = false;
@@ -253,11 +368,17 @@ class _GameScreenState extends State<GameScreen> {
 
   void _showGameOverDialog() {
     _timer?.cancel();
+    _pulseController.stop();
 
     final gameProvider = Provider.of<GameProvider>(context, listen: false);
     final l10n = AppLocalizations.of(context)!;
 
     AudioManager().playAchievement();
+
+    // Calcola score finale con penalità e bonus
+    final finalScore = gameProvider.calculateFinalScore();
+    final timeBonus = gameProvider.calculateTimeBonus();
+    final totalScore = (finalScore * timeBonus).round();
 
     showDialog(
       context: context,
@@ -285,7 +406,7 @@ class _GameScreenState extends State<GameScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.3),
+                  color: Colors.purple.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Column(
@@ -296,13 +417,18 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '${gameProvider.score}',
+                      '$totalScore',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 48,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if (timeBonus > 1.0)
+                      Text(
+                        'Bonus Tempo: x${timeBonus.toStringAsFixed(1)}',
+                        style: const TextStyle(color: Colors.green, fontSize: 14),
+                      ),
                   ],
                 ),
               ),
@@ -349,7 +475,6 @@ class _GameScreenState extends State<GameScreen> {
                 Navigator.of(context).pop();
                 setState(() {
                   _isLoading = true;
-                  _remainingSeconds = 60;
                   _selectedAnswerIndex = null;
                 });
                 _initializeGame();
@@ -401,6 +526,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -455,6 +581,9 @@ class _GameScreenState extends State<GameScreen> {
       );
     }
 
+    // Ottieni colore del medium
+    final mediumColor = gameProvider.currentMedium?.getColor() ?? Colors.purple;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -493,7 +622,7 @@ class _GameScreenState extends State<GameScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.7),
+                          color: Colors.purple.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -508,46 +637,102 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 ),
 
-                // Timer (se modalità tempo)
-                if (widget.mode.toLowerCase() == 'a tempo' || widget.mode.toLowerCase() == 'timed')
+                // Timer (se presente)
+                if (gameProvider.remainingTime > 0) ...[
+                  AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _remainingSeconds <= 10 ? _pulseAnimation.value : 1.0,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _getTimerColor().withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _remainingSeconds <= 10 ? [
+                              BoxShadow(
+                                color: Colors.red.withValues(alpha: 0.5),
+                                blurRadius: 20,
+                                spreadRadius: 5,
+                              )
+                            ] : null,
+                          ),
+                          child: Text(
+                            _formatTime(_remainingSeconds),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+
+                // Indicatore modalità speciale
+                if (gameProvider.isInverseMode) ...[
                   Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(top: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     decoration: BoxDecoration(
-                      color: _remainingSeconds <= 10 ? Colors.red : Colors.black54,
-                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.red.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      _formatTime(_remainingSeconds),
-                      style: const TextStyle(
+                    child: const Text(
+                      '⚠️ MODALITÀ INVERSA - SBAGLIA SEMPRE! ⚠️',
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
+                ],
 
                 const SizedBox(height: 20),
 
-                // Question Container
+                // Question Container con bordo colorato
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.all(20),
                     padding: const EdgeInsets.all(25),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.purple.withOpacity(0.5), width: 2),
+                      border: Border.all(color: mediumColor, width: 3),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        // Medium indicator (se non è mix)
+                        if (gameProvider.currentMedium != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: mediumColor.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: mediumColor, width: 2),
+                            ),
+                            child: Text(
+                              gameProvider.currentMedium!.name.toUpperCase(),
+                              style: TextStyle(
+                                color: mediumColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+
                         // Opera info
                         if (currentQuestion.operaName != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.purple.withOpacity(0.3),
+                              color: Colors.purple.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(15),
                             ),
                             child: Text(
@@ -580,7 +765,7 @@ class _GameScreenState extends State<GameScreen> {
                         const SizedBox(height: 40),
 
                         // Answer options based on question type
-                        if (currentQuestion.type == 'true_false')
+                        if (currentQuestion.type == 'true_false') ...[
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
@@ -595,9 +780,10 @@ class _GameScreenState extends State<GameScreen> {
                                     () => _handleTrueFalseAnswer(false),
                               ),
                             ],
-                          )
-                        else if (currentQuestion.type == 'multiple_choice' && gameProvider.currentAnswers != null)
+                          ),
+                        ] else if (currentQuestion.type == 'multiple_choice' && gameProvider.currentAnswers != null) ...[
                           ..._buildMultipleChoiceOptions(gameProvider.currentAnswers!),
+                        ],
                       ],
                     ),
                   ),
@@ -611,6 +797,7 @@ class _GameScreenState extends State<GameScreen> {
                     child: GestureDetector(
                       onTap: () {
                         _timer?.cancel();
+                        _pulseController.stop();
                         AudioManager().playNavigationBack();
                         Navigator.pop(context);
                       },
@@ -680,7 +867,7 @@ class _GameScreenState extends State<GameScreen> {
           child: ElevatedButton(
             onPressed: _showingFeedback ? null : () => _handleMultipleChoiceAnswer(index),
             style: ElevatedButton.styleFrom(
-              backgroundColor: buttonColor.withOpacity(0.3),
+              backgroundColor: buttonColor.withValues(alpha: 0.3),
               padding: const EdgeInsets.all(16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),

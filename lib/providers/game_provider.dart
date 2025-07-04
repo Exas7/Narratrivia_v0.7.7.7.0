@@ -1,192 +1,135 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/question.dart';
 import '../models/multiple_choice_answer.dart';
 import '../services/database_service.dart';
+import '../providers/user_provider.dart';
 
 class GameProvider extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
 
-  // Stato del gioco corrente
+  // Game state
   List<Question> _currentQuestions = [];
   Map<int, List<MultipleChoiceAnswer>> _multipleChoiceAnswers = {};
   int _currentQuestionIndex = 0;
   int _score = 0;
-  int _correctAnswers = 0;
-  int _wrongAnswers = 0;
+  int _correctAnswersCount = 0;
+  int _wrongAnswersCount = 0;
+  bool _isGameActive = false;
 
-  // Filtri selezionati
-  String? _selectedMedium;
-  String? _selectedUniverse;
-  String? _selectedDifficulty;
-  String? _selectedGameMode;
-  String? _selectedQuestionType;
+  // Timer state
+  Timer? _timer;
+  int _timeLeft = 0;
 
-  // Timer per modalità tempo
-  int _remainingTime = 0;
+  // Game settings
+  String _currentGameType = '';
+  String _currentMode = '';
+  int _operaId = 0;
 
   // Getters
   List<Question> get currentQuestions => _currentQuestions;
-  Question? get currentQuestion => _currentQuestionIndex < _currentQuestions.length
-      ? _currentQuestions[_currentQuestionIndex]
-      : null;
-  List<MultipleChoiceAnswer>? get currentAnswers =>
-      currentQuestion != null ? _multipleChoiceAnswers[currentQuestion!.questionId] : null;
-
+  Question? get currentQuestion =>
+      _currentQuestionIndex < _currentQuestions.length
+          ? _currentQuestions[_currentQuestionIndex]
+          : null;
+  List<MultipleChoiceAnswer>? get currentMultipleChoiceAnswers =>
+      currentQuestion != null
+          ? _multipleChoiceAnswers[currentQuestion!.questionId]
+          : null;
   int get currentQuestionIndex => _currentQuestionIndex;
   int get totalQuestions => _currentQuestions.length;
   int get score => _score;
-  int get correctAnswers => _correctAnswers;
-  int get wrongAnswers => _wrongAnswers;
-  int get remainingTime => _remainingTime;
+  int get correctAnswersCount => _correctAnswersCount;
+  int get wrongAnswersCount => _wrongAnswersCount;
+  bool get isGameActive => _isGameActive;
+  int get timeLeft => _timeLeft;
+  String get currentGameType => _currentGameType;
+  String get currentMode => _currentMode;
 
-  String? get selectedMedium => _selectedMedium;
-  String? get selectedUniverse => _selectedUniverse;
-  String? get selectedDifficulty => _selectedDifficulty;
-  String? get selectedGameMode => _selectedGameMode;
-  String? get selectedQuestionType => _selectedQuestionType;
-
-  bool get isGameOver => _currentQuestionIndex >= _currentQuestions.length;
-  double get accuracy => _correctAnswers + _wrongAnswers > 0
-      ? _correctAnswers / (_correctAnswers + _wrongAnswers)
-      : 0.0;
-
-  /// Imposta i filtri di gioco
-  void setGameFilters({
-    String? medium,
-    String? universe,
-    String? difficulty,
-    String? gameMode,
-    String? questionType,
-  }) {
-    _selectedMedium = medium;
-    _selectedUniverse = universe;
-    _selectedDifficulty = difficulty;
-    _selectedGameMode = gameMode;
-    _selectedQuestionType = questionType;
+  // Reset game state
+  void resetGame() {
+    _currentQuestions = [];
+    _multipleChoiceAnswers = {};
+    _currentQuestionIndex = 0;
+    _score = 0;
+    _correctAnswersCount = 0;
+    _wrongAnswersCount = 0;
+    _isGameActive = false;
+    _timer?.cancel();
+    _timeLeft = 0;
     notifyListeners();
   }
 
-  /// Carica le domande per il gioco
+  // Load questions based on type and filters
   Future<void> loadQuestions({
     required String questionType,
+    int? operaId,
+    String mode = 'classic',
     int limit = 20,
   }) async {
+    resetGame();
+
+    _currentGameType = questionType;
+    _currentMode = mode;
+    _operaId = operaId ?? 0;
+
     try {
-      _resetGameState();
-
-      // Se medium è "mix", usa null per ottenere domande da tutti i medium
-      final mediumFilter = (_selectedMedium == 'mix' || _selectedMedium == 'MIX')
-          ? null
-          : _selectedMedium;
-
       if (questionType == 'true_false') {
         _currentQuestions = await _databaseService.getTrueFalseQuestions(
-          difficulty: _selectedDifficulty,
-          mediumName: mediumFilter,
-          universeName: _selectedUniverse,
+          operaId: operaId,
           limit: limit,
         );
       } else if (questionType == 'multiple_choice') {
         final questionsWithAnswers = await _databaseService.getMultipleChoiceQuestionsWithAnswers(
-          difficulty: _selectedDifficulty,
-          mediumName: mediumFilter,
-          universeName: _selectedUniverse,
+          operaId: operaId,
           limit: limit,
         );
+
+        _currentQuestions = [];
+        _multipleChoiceAnswers = {};
 
         for (var item in questionsWithAnswers) {
           final question = item['question'] as Question;
           final answers = item['answers'] as List<MultipleChoiceAnswer>;
+
           _currentQuestions.add(question);
           _multipleChoiceAnswers[question.questionId] = answers;
         }
-      } else {
-        // Carica domande miste
-        final halfLimit = (limit / 2).ceil();
-
-        // Carica domande true/false
-        final tfQuestions = await _databaseService.getTrueFalseQuestions(
-          difficulty: _selectedDifficulty,
-          mediumName: mediumFilter,
-          universeName: _selectedUniverse,
-          limit: halfLimit,
-        );
-        _currentQuestions.addAll(tfQuestions);
-
-        // Carica domande multiple choice
-        final mcQuestionsWithAnswers = await _databaseService.getMultipleChoiceQuestionsWithAnswers(
-          difficulty: _selectedDifficulty,
-          mediumName: mediumFilter,
-          universeName: _selectedUniverse,
-          limit: halfLimit,
-        );
-
-        for (var item in mcQuestionsWithAnswers) {
-          final question = item['question'] as Question;
-          final answers = item['answers'] as List<MultipleChoiceAnswer>;
-          _currentQuestions.add(question);
-          _multipleChoiceAnswers[question.questionId] = answers;
-        }
-
-        // Mischia le domande
-        _currentQuestions.shuffle();
       }
 
-      // Imposta il tempo per modalità tempo
-      final gameModeToCheck = _selectedGameMode?.toLowerCase() ?? '';
-      if (gameModeToCheck == 'tempo' || gameModeToCheck == 'a tempo' || gameModeToCheck == 'timed') {
-        _remainingTime = 60; // 1 minuto totale per modalità tempo
-      }
-
+      _isGameActive = true;
       notifyListeners();
     } catch (e) {
-      _currentQuestions = [];
-      notifyListeners();
     }
   }
 
-  /// Risponde alla domanda corrente
+  // Answer current question
   Future<void> answerQuestion(dynamic answer) async {
-    if (isGameOver || currentQuestion == null) return;
+    if (!_isGameActive || _currentQuestionIndex >= _currentQuestions.length) return;
 
+    final question = _currentQuestions[_currentQuestionIndex];
     bool isCorrect = false;
 
-    if (currentQuestion!.type == 'true_false') {
-      isCorrect = currentQuestion!.correctAnswerAsBool == answer;
-    } else if (currentQuestion!.type == 'multiple_choice') {
-      if (answer is int) {
-        // Risposta per indice
-        final answers = _multipleChoiceAnswers[currentQuestion!.questionId];
-        if (answers != null && answer < answers.length) {
-          isCorrect = answers[answer].isCorrect;
-        }
-      } else if (answer is String) {
-        // Risposta per testo
-        final answers = _multipleChoiceAnswers[currentQuestion!.questionId];
-        if (answers != null) {
-          final selectedAnswer = answers.firstWhere(
-                (a) => a.optionText == answer,
-            orElse: () => answers.first,
-          );
-          isCorrect = selectedAnswer.isCorrect;
-        }
-      }
+    if (question.type == 'true_false') {
+      isCorrect = answer.toString() == question.correctAnswer;
+    } else if (question.type == 'multiple_choice') {
+      isCorrect = answer is MultipleChoiceAnswer && answer.isCorrect;
     }
 
     if (isCorrect) {
-      _correctAnswers++;
-      _score += currentQuestion!.basePoints;
+      _score += question.basePoints;
+      _correctAnswersCount++;
     } else {
-      _wrongAnswers++;
+      _wrongAnswersCount++;
     }
 
-    // Aggiorna le statistiche nel database
-    await _databaseService.updateQuestionStats(currentQuestion!.questionId, isCorrect);
+    // Update question statistics in database
+    await _databaseService.updateQuestionStats(question.questionId, isCorrect);
 
     notifyListeners();
   }
 
-  /// Passa alla prossima domanda
+  // Move to next question
   void nextQuestion() {
     if (_currentQuestionIndex < _currentQuestions.length - 1) {
       _currentQuestionIndex++;
@@ -194,31 +137,45 @@ class GameProvider extends ChangeNotifier {
     }
   }
 
-  /// Aggiorna il tempo rimanente
-  void updateRemainingTime(int seconds) {
-    _remainingTime = seconds;
+  // Start timer for timed mode
+  void startTimer(int seconds) {
+    _timer?.cancel();
+    _timeLeft = seconds;
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_timeLeft > 0) {
+        _timeLeft--;
+        notifyListeners();
+      } else {
+        timer.cancel();
+        // Time's up - could trigger auto-end game
+      }
+    });
+  }
+
+  // End game and update user statistics
+  void endGame(BuildContext context, UserProvider userProvider) {
+    _isGameActive = false;
+    _timer?.cancel();
+
+    // Calculate if won (at least 50% correct answers)
+    final totalAnswers = _correctAnswersCount + _wrongAnswersCount;
+    final won = totalAnswers > 0 && (_correctAnswersCount / totalAnswers) >= 0.5;
+
+    // Update user statistics
+    userProvider.updateGameStats(
+      won: won,
+      correctAnswersCount: _correctAnswersCount,
+      wrongAnswersCount: _wrongAnswersCount,
+      scoreEarned: _score,
+    );
+
     notifyListeners();
   }
 
-  /// Reset dello stato del gioco
-  void _resetGameState() {
-    _currentQuestions = [];
-    _multipleChoiceAnswers = {};
-    _currentQuestionIndex = 0;
-    _score = 0;
-    _correctAnswers = 0;
-    _wrongAnswers = 0;
-    _remainingTime = 0;
-  }
-
-  /// Reset completo
-  void resetGame() {
-    _resetGameState();
-    _selectedMedium = null;
-    _selectedUniverse = null;
-    _selectedDifficulty = null;
-    _selectedGameMode = null;
-    _selectedQuestionType = null;
-    notifyListeners();
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 }

@@ -1,99 +1,54 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-
-// Import locali
-import 'l10n/app_localizations.dart';
-import 'providers/settings_provider.dart';
-import 'providers/game_provider.dart'; // NUOVO IMPORT
-import 'services/audio_manager.dart';
 import 'screens/splash_screen.dart';
+import 'providers/settings_provider.dart';
+import 'providers/game_provider.dart';
+import 'providers/user_provider.dart';
+import 'l10n/app_localizations.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(
-    MultiProvider( // CAMBIATO DA ChangeNotifierProvider A MultiProvider
+    MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => GameProvider()), // NUOVO PROVIDER
+        ChangeNotifierProvider(create: (_) => GameProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: const MyApp(),
     ),
   );
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      // App in background - pausa la musica
-      AudioManager().pauseMenuMusic();
-    } else if (state == AppLifecycleState.resumed) {
-      // App in foreground - riprendi la musica
-      AudioManager().resumeMenuMusic();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<SettingsProvider>(
-      builder: (context, settings, _) {
+      builder: (context, settings, child) {
         return MaterialApp(
-          title: 'NARRATRIVIA',
+          title: 'Narratrivia',
+          debugShowCheckedModeBanner: false,
           theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-            useMaterial3: true,
+            primarySwatch: Colors.blue,
+            brightness: Brightness.dark,
             fontFamily: 'Roboto',
           ),
-          locale: Locale(settings.languageCode),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          locale: Locale(settings.languageCode),
+          home: const SplashScreen(),
           builder: (context, child) {
-            return Stack(
-              children: [
-                child!,
-                // Global brightness overlay
-                Consumer<SettingsProvider>(
-                  builder: (context, settings, _) {
-                    // Minimo 30% di oscuramento (0.3 opacità)
-                    final opacity = 0.7 * (1 - settings.brightness);
-                    return IgnorePointer(
-                      child: Container(
-                        color: Colors.black.withOpacity(opacity),
-                      ),
-                    );
-                  },
-                ),
-              ],
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                platformBrightness: Brightness.values[
+                ((settings.brightness * (Brightness.values.length - 1)).round())
+                    .clamp(0, Brightness.values.length - 1)
+                ],
+              ),
+              child: child ?? const SizedBox.shrink(),
             );
           },
-          home: const SplashScreen(),
         );
       },
     );
