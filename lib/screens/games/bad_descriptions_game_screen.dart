@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../l10n/app_localizations.dart';
-import '../../services/audio_manager.dart';
+import '/l10n/app_localizations.dart';
+import '/services/audio_manager.dart';
 
 class BadDescriptionsGameScreen extends StatefulWidget {
   final String category;
   final String mode;
+  final String? variant; // Aggiunto parametro variant
 
   const BadDescriptionsGameScreen({
     super.key,
     required this.category,
     required this.mode,
+    this.variant, // Parametro opzionale per POV/varianti
   });
 
   @override
@@ -17,14 +19,6 @@ class BadDescriptionsGameScreen extends StatefulWidget {
 }
 
 class _BadDescriptionsGameScreenState extends State<BadDescriptionsGameScreen> {
-  final TextEditingController _answerController = TextEditingController();
-
-  @override
-  void dispose() {
-    _answerController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -47,9 +41,9 @@ class _BadDescriptionsGameScreenState extends State<BadDescriptionsGameScreen> {
               children: [
                 const SizedBox(height: 30),
                 Text(
-                  '${l10n.get('bad_descriptions')} - ${widget.category}',
+                  l10n.get('bad_descriptions'),
                   style: const TextStyle(
-                    fontSize: 25,
+                    fontSize: 30,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     shadows: [
@@ -60,74 +54,64 @@ class _BadDescriptionsGameScreenState extends State<BadDescriptionsGameScreen> {
                       ),
                     ],
                   ),
-                  textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 20),
                 Text(
-                  widget.mode,
+                  '${l10n.get('category')}: ${widget.category}',
                   style: const TextStyle(
                     fontSize: 20,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 10.0,
-                        color: Colors.black,
-                        offset: Offset(2.0, 2.0),
-                      ),
-                    ],
+                    color: Colors.white70,
                   ),
                 ),
+                Text(
+                  '${l10n.get('mode')}: ${widget.mode}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: Colors.white70,
+                  ),
+                ),
+                if (widget.variant != null)
+                  Text(
+                    'POV: ${widget.variant}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      color: Colors.white70,
+                    ),
+                  ),
                 const Spacer(),
-                // Placeholder per il contenuto del gioco
+                // Placeholder content
                 Container(
                   margin: const EdgeInsets.all(20),
-                  padding: const EdgeInsets.all(30),
+                  padding: const EdgeInsets.all(40),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(15),
+                    color: Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.purple, width: 2),
                   ),
                   child: Column(
                     children: [
-                      // Area per la descrizione
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.deepPurple.withOpacity(0.5)),
-                        ),
-                        child: Text(
-                          '${l10n.get('to_implement')}\n\nQui apparirà una descrizione fuorviante di un\'opera...',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            height: 1.5,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                      const Icon(
+                        Icons.description_outlined,
+                        size: 100,
+                        color: Colors.white54,
                       ),
-                      const SizedBox(height: 30),
-                      // Input per la risposta
-                      TextField(
-                        controller: _answerController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: 'Inserisci la tua risposta...',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                          filled: true,
-                          fillColor: Colors.white.withOpacity(0.1),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Colors.deepPurple),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Colors.deepPurple),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Colors.purple, width: 2),
-                          ),
+                      const SizedBox(height: 20),
+                      Text(
+                        l10n.get('to_implement'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
                         ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Bad Descriptions game mode\nCategory: ${widget.category}\nMode: ${widget.mode}${widget.variant != null ? '\nPOV: ${widget.variant}' : ''}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
