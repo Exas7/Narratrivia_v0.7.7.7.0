@@ -85,6 +85,15 @@ class AudioManager {
     }
   }
 
+  Future<void> playSeatClick() async {
+    try {
+      await _sfxPlayer.play(AssetSource(seatClickSound));
+      await _sfxPlayer.setVolume(_sfxVolume);
+    } catch (e) {
+      // Gestione silenziosa dell'errore
+    }
+  }
+
   Future<void> playWrongAnswer() async {
     try {
       await _sfxPlayer.play(AssetSource(wrongAnswerSound));

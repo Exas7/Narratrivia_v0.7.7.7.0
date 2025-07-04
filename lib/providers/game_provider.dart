@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/question.dart';
 import '../models/multiple_choice_answer.dart';
+import '../models/medium.dart';
 import '../services/database_service.dart';
 import '../providers/user_provider.dart';
 
@@ -25,6 +26,9 @@ class GameProvider extends ChangeNotifier {
   String _currentGameType = '';
   String _currentMode = '';
   int _operaId = 0;
+  Medium? _currentMedium;
+  String? _currentVariant;
+  bool _isInverseMode = false;
 
   // Getters
   List<Question> get currentQuestions => _currentQuestions;
@@ -45,6 +49,11 @@ class GameProvider extends ChangeNotifier {
   int get timeLeft => _timeLeft;
   String get currentGameType => _currentGameType;
   String get currentMode => _currentMode;
+  Medium? get currentMedium => _currentMedium;
+  String? get currentVariant => _currentVariant;
+  bool get isInverseMode => _isInverseMode;
+  List<MultipleChoiceAnswer>? get currentAnswers => currentMultipleChoiceAnswers;
+  int get remainingTime => _timeLeft;
 
   // Reset game state
   void resetGame() {
@@ -57,6 +66,29 @@ class GameProvider extends ChangeNotifier {
     _isGameActive = false;
     _timer?.cancel();
     _timeLeft = 0;
+    notifyListeners();
+  }
+
+  // Set filters and game settings
+  void setGameFilters({
+    String? medium,
+    String? gameMode,
+    String? questionType,
+    String? gameVariant,
+  }) {
+    if (gameMode != null) {
+      _currentMode = gameMode;
+    }
+    if (questionType != null) {
+      _currentGameType = questionType;
+    }
+    _currentVariant = gameVariant;
+    _isInverseMode = gameVariant == 'inverse';
+    if (medium != null) {
+      _currentMedium = Medium(id: 0, name: medium);
+    } else {
+      _currentMedium = null;
+    }
     notifyListeners();
   }
 
