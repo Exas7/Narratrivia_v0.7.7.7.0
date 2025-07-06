@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "239032592317",
+    "project_id": "narratrivia-exas",
+    "storage_bucket": "narratrivia-exas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:239032592317:android:b71cb1cc63a67ec7f514d4",
+        "android_client_info": {
+          "package_name": "com.gagofed.narratrivia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBz1MDn_LOGH9P2qOaiXsazTPFYd5HoHeg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

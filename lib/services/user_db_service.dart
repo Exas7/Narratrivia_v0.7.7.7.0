@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -33,9 +34,13 @@ class UserDatabaseService {
         final data = await rootBundle.load('assets/data/user_info.db');
         final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         await File(path).writeAsBytes(bytes, flush: true);
-        print('User database copied successfully');
+        if (kDebugMode) {
+          print('User database copied successfully');
+        }
       } catch (e) {
-        print('Error copying user database: $e');
+        if (kDebugMode) {
+          print('Error copying user database: $e');
+        }
       }
     }
 
@@ -44,7 +49,9 @@ class UserDatabaseService {
       path,
       version: 1,
       onOpen: (db) async {
-        print('User database opened successfully');
+        if (kDebugMode) {
+          print('User database opened successfully');
+        }
       },
     );
   }
